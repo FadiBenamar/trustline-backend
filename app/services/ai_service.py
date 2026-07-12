@@ -66,12 +66,20 @@ class AIService:
         fallacy_reason = "No systemic logical fallacies (e.g., ad hominem, fake authority) were identified."
         
         # High Risk Patterns (Scams, panic forwarding, extreme claims)
-        if any(w in content_lower for w in ["congratulations", "won a prize", "click here", "forward to", "whatsapp group", "secret recipe", "miracle cure"]):
+        high_risk_keywords = ["congratulations", "won a prize", "click here", "forward to", "whatsapp group", "secret recipe", "miracle cure"]
+        matched_high_risk = [w for w in high_risk_keywords if w in content_lower]
+
+        # Moderate Risk Patterns (Conspiracies, weak citations, general claims)
+        moderate_risk_keywords = ["they say", "scientists found", "government hiding", "shocking truth", "is artificial", "breaking:"]
+        matched_moderate_risk = [w for w in moderate_risk_keywords if w in content_lower]
+
+        if matched_high_risk:
+            matched_str = "', '".join(matched_high_risk)
             emotional_manip = True
-            emotional_reason = "Flagged for loaded language, urgency triggers ('forward to'), and sensationalized promises."
+            emotional_reason = f"Flagged for loaded language and urgency triggers detected in the text (e.g. '{matched_str}')."
             
             missing_sources = True
-            missing_sources_reason = "Flagged for making sensational claims ('miracle cure', 'won a prize') with zero external citations, links, or verifiable sources."
+            missing_sources_reason = f"Flagged for making sensational claims (e.g. '{matched_str}') with zero external citations, links, or verifiable sources."
             
             synthetic_signals = True
             synthetic_reason = "Signals commonly associated with synthetic text: repetitive phrasing and generic structures typical of automated spam templates."
@@ -83,16 +91,16 @@ class AIService:
             risk_score = 90
             correction_snippet = "Hey, this message looks like it might contain misleading information (it uses urgent language and doesn't back up its claims). Let's avoid forwarding it until we can verify it from a trusted news source."
 
-        # Moderate Risk Patterns (Conspiracies, weak citations, general claims)
-        elif any(w in content_lower for w in ["they say", "scientists found", "government hiding", "shocking truth", "is artificial", "breaking:"]):
+        elif matched_moderate_risk:
+            matched_str = "', '".join(matched_moderate_risk)
             emotional_manip = True
-            emotional_reason = "Flagged for conspiracy-leaning framing ('government hiding') and sensational headlines ('breaking')."
+            emotional_reason = f"Flagged for conspiracy-leaning framing and sensational headlines detected in the text (e.g. '{matched_str}')."
             
             missing_sources = True
-            missing_sources_reason = "Flagged for using vague source citations ('they say', 'scientists found') without providing specific verifiable references."
+            missing_sources_reason = f"Flagged for using vague source citations (e.g. '{matched_str}') without providing specific verifiable references."
             
             logical_fallacy = True
-            fallacy_reason = "Flagged for Appeal to Anonymous Authority ('they say') and Strawman argumentation."
+            fallacy_reason = "Flagged for Appeal to Anonymous Authority and Strawman argumentation."
             
             traffic_light = "yellow"
             risk_score = 65
