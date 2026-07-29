@@ -33,11 +33,9 @@ async def analyze_content(data: AnalyzeRequest):
             extracted_text = await ScraperService.scrape_url(content)
             analysis_text = extracted_text
         except Exception as e:
-            logger.error(f"Scraping error: {str(e)}")
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Failed to extract content from URL: {str(e)}"
-            )
+            logger.warning(f"Scraping error for {content}: {str(e)}. Using fallback text.")
+            extracted_text = f"[Scraped text unavailable: {str(e)}]"
+            analysis_text = content
     else:
         analysis_text = content
 
@@ -50,7 +48,7 @@ async def analyze_content(data: AnalyzeRequest):
             lite_mode=data.lite_mode
         )
         
-        # If we scraped a URL, populate the raw text in response
+        # Populate extracted_text if content was a URL
         if is_url_input:
             response.extracted_text = extracted_text
             
