@@ -10,33 +10,6 @@
   let toast = '', showFullText = false;
   const navItems = [['scan', asset.scan, 'Scan'], ['history', asset.history, 'History'], ['learn', asset.learn, 'Learn'], ['profile', asset.profile, 'Profile']];
   const showToast = (message) => { toast = message; setTimeout(() => toast = '', 2600); };
-<<<<<<< HEAD
-  const authenticate = () => { localStorage.setItem('trustline-onboarded', '1'); screen = 'app'; page = 'check'; };
-  const setPreset = (kind) => content = presets[kind];
-  const riskClass = (risk) => risk === 'green' ? 'green' : risk === 'red' ? 'red' : 'yellow';
-  const riskText = (risk) => risk === 'green' ? ['Trustworthy', 'This looks safe to share.'] : risk === 'red' ? ['High risk', 'This content may be misleading.'] : ['Needs verification', 'Pause and check before sharing.'];
-
-  async function analyze() {
-    if (!content.trim()) return showToast('Paste a message, post, or link first.');
-    isChecking = true;
-    try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/analyze/`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content, lite_mode: false }) });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.detail || 'Analysis failed.');
-      result = data;
-      const history = JSON.parse(localStorage.getItem('trustline-history') || '[]');
-      history.unshift({ content: content.slice(0, 70), risk: data.traffic_light, score: data.overall_risk_score, time: new Date().toLocaleDateString() });
-      localStorage.setItem('trustline-history', JSON.stringify(history.slice(0, 12)));
-      page = 'results';
-    } catch (error) { showToast(error.message || 'We could not check that right now.'); }
-    finally { isChecking = false; }
-  }
-  async function copySuggestion() {
-    try { await navigator.clipboard.writeText(result.correction_snippet); showToast('Suggested response copied.'); }
-    catch { showToast('Select and copy the response manually.'); }
-  }
-  function history() { return JSON.parse(localStorage.getItem('trustline-history') || '[]'); }
-=======
   const risk = (value) => value === 'green' ? ['Trustworthy', 'Low', 'trusted'] : value === 'red' ? ['High Risk', 'High', 'danger'] : ['Careful', 'Moderate', 'careful'];
   const flags = (data) => [['Sources', data.flags.missing_sources_context, asset.book], ['Emotional Language', data.flags.emotional_manipulation, asset.heart], ['Context', data.flags.logical_fallacies, asset.context], ['Images', data.flags.synthetic_text_signals, asset.image], ['AI Content', data.flags.synthetic_text_signals, asset.robot]];
   async function paste() { try { content = await navigator.clipboard.readText(); } catch { showToast('Clipboard access was not available.'); } }
@@ -44,7 +17,6 @@
   async function copyCorrection() { try { await navigator.clipboard.writeText(result.correction_snippet); showToast('Correction copied.'); } catch { showToast('Select the correction and copy it.'); } }
   const historyItems = () => JSON.parse(localStorage.getItem('trustline-history') || '[]');
   const toggle = (item) => selected = selected.includes(item) ? selected.filter((entry) => entry !== item) : [...selected, item];
->>>>>>> 787cf50 (Refactor code structure for improved readability and maintainability)
 </script>
 
 <svelte:head><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous"><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@1,500&display=swap" rel="stylesheet"></svelte:head>
@@ -54,20 +26,20 @@
     {#if page === 'scan'}
       <header class="brand-row"><div class="brand"><img src={asset.logo} alt=""/> <strong>Trust</strong>Line</div><button class="language"><img src={asset.globe} alt=""/> EN <span>⌄</span></button></header>
       <section class="lite"><div><img src={asset.bolt} alt=""/><p><b>Lite mode</b><small>Designed for slow internet</small></p></div><button class:enabled={liteMode} class="switch" onclick={() => liteMode = !liteMode} aria-label="Toggle lite mode"><i></i></button></section>
-      <section class="scan-form"><div class="paste-box"><textarea bind:value={content} placeholder="Paste the message, post or link here..."></textarea><div><img src={asset.clip} alt=""/><button onclick={paste}><img src={asset.paste} alt=""/>Paste</button></div></div><p class="privacy"><img src={asset.lock} alt=""/>We only use this to check the message. It’s not saved or shared.</p><button class="main-button" onclick={analyze} disabled={checking}><img src={asset.search} alt=""/>{checking ? 'Analyzing…' : 'Analyze'}</button></section>
+      <section class="scan-form"><div class="paste-box"><textarea bind:value={content} placeholder="Paste the message, post or link here..."></textarea><div><img src={asset.clip} alt=""/><button onclick={paste}><img src={asset.paste} alt=""/>Paste</button></div></div><p class="privacy"><img src={asset.lock} alt=""/>We only use this to check the message. It's not saved or shared.</p><button class="main-button" onclick={analyze} disabled={checking}><img src={asset.search} alt=""/>{checking ? 'Analyzing…' : 'Analyze'}</button></section>
       <button class="clue-card" onclick={() => page = 'learn'}><img src={asset.clue} alt=""/><span><b>Spot the Clues</b><small>Practice spotting misinformation before revealing the answer. Encourage your critical thinking!</small></span><i><img src={asset.arrow} alt=""/></i></button>
       <div class="divider"><span></span>or<span></span></div><section class="indications"><p>Indications</p><div><span><img src={asset.trusted} alt=""/>TRUSTWORTHY</span><span><img src={asset.careful} alt=""/>CAREFUL</span><span><img src={asset.danger} alt=""/>HIGH RISK</span></div></section>
     {:else if page === 'result' && result}
       {@const label = risk(result.traffic_light)}
       <header class="title-row"><button onclick={() => page = 'scan'}><img src={asset.back} alt="Back"/></button><b>Results</b><i></i></header>
-      <article class="message-card"><em>“{(result.extracted_text || content).slice(0, 135)}{(result.extracted_text || content).length > 135 ? '…' : ''}”</em><button onclick={() => showFullText = true}>View full text <img src={asset.right} alt=""/></button></article>
+      <article class="message-card"><em>"{(result.extracted_text || content).slice(0, 135)}{(result.extracted_text || content).length > 135 ? '…' : ''}"</em><button onclick={() => showFullText = true}>View full text <img src={asset.right} alt=""/></button></article>
       <section class="verdict {label[2]}"><div class="verdict-icon"><img src={asset.check} alt=""/></div><b>{label[0]}</b><small>Risk level: {label[1]}</small></section>
       <section class="breakdown"><h2>Trust Breakdown</h2>{#each flags(result) as [name, item, icon]}<article><i></i><span><img src={icon} alt=""/></span><div><b>{name}</b><p>{item.explanation}</p></div></article>{/each}</section>
       <section class="correction"><b>⌕ &nbsp;SUGGESTED CORRECTION</b><p>{result.correction_snippet}</p><button onclick={copyCorrection}>Create correction</button></section><button class="main-button" onclick={() => { content=''; page='scan'; }}>Verify another content</button><aside class="tip"><span><img src={asset.bulb} alt=""/></span><p><b>Tip:</b> Even trustworthy posts are worth a second look before you share.</p></aside>
     {:else if page === 'learn'}
-      <header class="title-row"><button onclick={() => page = 'scan'}><img src={asset.back} alt="Back"/></button><b>Spot the Clues</b><i></i></header><article class="message-card lesson-message"><em>“WARNING!!! Put your phone on airplane mode tonight or hackers can steal all your private information through 5G signals. Share this before it gets deleted!”</em></article><section class="question"><h1>What caught your attention?</h1><div class="choices">{#each [['No source', asset.book], ['Emotional language', asset.heart], ['Clickbait', asset.clue], ['Missing context', asset.context], ['Edited image', asset.image], ['AI-generated', asset.robot]] as item}<button class:selected={selected.includes(item[0])} onclick={() => toggle(item[0])}><img src={item[1]} alt=""/>{item[0]}</button>{/each}</div></section><button class="main-button" onclick={() => page = 'lesson-result'}>Reveal TrustLine Analysis</button>
+      <header class="title-row"><button onclick={() => page = 'scan'}><img src={asset.back} alt="Back"/></button><b>Spot the Clues</b><i></i></header><article class="message-card lesson-message"><em>"WARNING!!! Put your phone on airplane mode tonight or hackers can steal all your private information through 5G signals. Share this before it gets deleted!"</em></article><section class="question"><h1>What caught your attention?</h1><div class="choices">{#each [['No source', asset.book], ['Emotional language', asset.heart], ['Clickbait', asset.clue], ['Missing context', asset.context], ['Edited image', asset.image], ['AI-generated', asset.robot]] as item}<button class:selected={selected.includes(item[0])} onclick={() => toggle(item[0])}><img src={item[1]} alt=""/>{item[0]}</button>{/each}</div></section><button class="main-button" onclick={() => page = 'lesson-result'}>Reveal TrustLine Analysis</button>
     {:else if page === 'lesson-result'}
-      <header class="title-row"><button onclick={() => page = 'learn'}><img src={asset.back} alt="Back"/></button><b>Results</b><i></i></header><article class="message-card lesson-message"><em>“WARNING!!! Put your phone on airplane mode tonight or hackers can steal all your private information through 5G signals. Share this before it gets deleted!”</em></article><section class="practice-result"><h1>🎉 Great thinking!</h1><div><p>You chose</p><span>⚠ High risk</span></div><div><p>You noticed</p><span>Emotional language</span><span>Clickbait</span></div><div><p>TrustLine also found</p><span>AI-generated</span></div></section><div class="button-pair"><button onclick={() => page = 'learn'}>Try Another</button><button onclick={() => page = 'scan'}>Full Analysis</button></div><aside class="tip"><span><img src={asset.bulb} alt=""/></span><p><b>Tip:</b> Emotional words and missing sources are two of the biggest red flags — trust your gut when something feels rushed or urgent.</p></aside>
+      <header class="title-row"><button onclick={() => page = 'learn'}><img src={asset.back} alt="Back"/></button><b>Results</b><i></i></header><article class="message-card lesson-message"><em>"WARNING!!! Put your phone on airplane mode tonight or hackers can steal all your private information through 5G signals. Share this before it gets deleted!"</em></article><section class="practice-result"><h1>🎉 Great thinking!</h1><div><p>You chose</p><span>⚠ High risk</span></div><div><p>You noticed</p><span>Emotional language</span><span>Clickbait</span></div><div><p>TrustLine also found</p><span>AI-generated</span></div></section><div class="button-pair"><button onclick={() => page = 'learn'}>Try Another</button><button onclick={() => page = 'scan'}>Full Analysis</button></div><aside class="tip"><span><img src={asset.bulb} alt=""/></span><p><b>Tip:</b> Emotional words and missing sources are two of the biggest red flags — trust your gut when something feels rushed or urgent.</p></aside>
     {:else if page === 'loading'}
       <header class="title-row"><button onclick={() => { checking = false; page = 'scan'; }}><img src={asset.back} alt="Back"/></button><b>Checking content</b><i></i></header>
       <section class="loading-card">
@@ -103,7 +75,7 @@
     <button class="full-text-backdrop" aria-label="Close full text" onclick={() => showFullText = false}></button>
     <div class="full-text-sheet" role="dialog" aria-modal="true" aria-label="Full text" tabindex="-1">
       <header><b>Full Text</b><button aria-label="Close full text" onclick={() => showFullText = false}><img src={asset.close} alt=""/></button></header>
-      <div class="full-text-quote"><span>“</span><p>{result.extracted_text || content}</p><span>”</span></div>
+      <div class="full-text-quote"><span>"</span><p>{result.extracted_text || content}</p><span>"</span></div>
     </div>
   </div>
 {/if}
