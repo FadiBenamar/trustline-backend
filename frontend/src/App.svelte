@@ -6,18 +6,57 @@
     trusted: '/figma-assets/trusted.svg', careful: '/figma-assets/careful.svg', danger: '/figma-assets/danger.svg',
     back: '/figma-assets/back.svg', right: '/figma-assets/right.svg', close: '/figma-assets/close.svg', check: '/figma-assets/check.svg', book: '/figma-assets/book.svg', heart: '/figma-assets/heart.svg', context: '/figma-assets/context.svg', image: '/figma-assets/image.svg', robot: '/figma-assets/robot.svg', bulb: '/figma-assets/bulb.svg'
   };
-  let page = localStorage.getItem('trustline-onboarded') ? 'scan' : 'onboarding', content = '', liteMode = true, result = null, checking = false, selected = [], pickedRisk = '';
-  let toast = '', showFullText = false, showPasteOptions = false;
+  import { supabase } from './lib/supabase.js';
+  let page = $state(localStorage.getItem('trustline-onboarded') ? 'scan' : 'onboarding');
+  let content = $state('');
+  let liteMode = $state(true);
+  let result = $state(null);
+  let checking = $state(false);
+  let selected = $state([]);
+  let pickedRisk = $state('');
+  let toast = $state('');
+  let showFullText = $state(false);
+  let showPasteOptions = $state(false);
+  let email = $state('');
+  let password = $state('');
+  let authError = $state('');
+  let session = $state(null);
+  $effect(() => {
+    supabase.auth.getSession().then(({ data }) => { session = data.session; });
+    supabase.auth.onAuthStateChange((_event, newSession) => { session = newSession; });
+  });
   const navItems = [['scan', asset.scan, 'Scan'], ['history', asset.history, 'History'], ['learn', asset.learn, 'Learn'], ['profile', asset.profile, 'Profile']];
   const practiceMessage = 'WARNING!!! Put your phone on airplane mode tonight or hackers can steal all your private information through 5G signals. Share this before it gets deleted!';
   const showToast = (message) => { toast = message; setTimeout(() => toast = '', 2600); };
-  const authenticate = () => { localStorage.setItem('trustline-onboarded', '1'); page = 'scan'; };
+  async function handleAuth() {
+    authError = '';
+    if (!email || !password) { authError = 'Renseigne un email et un mot de passe.'; return; }
+    const isSignup = page === 'signup';
+    const action = isSignup
+      ? supabase.auth.signUp({ email, password })
+      : supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await action;
+    if (error) { authError = error.message; return; }
+    if (isSignup && !data.session) {
+      page = 'check-email';
+      return;
+    }
+    session = data.session;
+    localStorage.setItem('trustline-onboarded', '1');
+    page = 'scan';
+  }
+  async function logout() {
+    await supabase.auth.signOut();
+    session = null;
+    localStorage.removeItem('trustline-onboarded');
+    page = 'onboarding';
+  }
   const risk = (value) => value === 'green' ? ['Trustworthy', 'Low', 'trusted'] : value === 'red' ? ['High Risk', 'High', 'danger'] : ['Careful', 'Moderate', 'careful'];
   const score = (data) => Number.isFinite(Number(data?.overall_risk_score)) ? Math.min(100, Math.max(0, Math.round(Number(data.overall_risk_score)))) : 0;
   const flags = (data) => [['Sources', data.flags.missing_sources_context, asset.book], ['Emotional Language', data.flags.emotional_manipulation, asset.heart], ['Context', data.flags.logical_fallacies, asset.context], ['Images', data.flags.synthetic_text_signals, asset.image], ['AI Content', data.flags.synthetic_text_signals, asset.robot]];
   const API_BASE = import.meta.env.VITE_API_URL || '';
   async function paste() { try { content = await navigator.clipboard.readText(); showPasteOptions = false; } catch { showToast('Clipboard access was not available.'); } }
-  async function analyze() { if (!content.trim()) return showToast('Paste a message, post or link first.'); checking = true; page = 'loading'; try { const res = await fetch(`${API_BASE}/analyze/`, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({content, lite_mode: liteMode}) }); const data = await res.json(); if (!res.ok) throw new Error(data.detail || 'Analysis failed.'); result = data; const history = JSON.parse(localStorage.getItem('trustline-history') || '[]'); history.unshift({ content: content.slice(0, 80), risk: data.traffic_light, time: 'Just now' }); localStorage.setItem('trustline-history', JSON.stringify(history.slice(0, 12))); page = 'result'; } catch (error) { showToast(error.message || 'Unable to check this content.'); page = 'scan'; } finally { checking = false; } }
+  async function analyze() { if (!content.trim()) return showToast('Paste a message, post or link first.'); checking = true; page = 'loading'; try { const res = await fetch(`${API_BASE}/analyze/`, { method: 'POST', headers: {'Content-Type':'application/json', ...(session ? { 'Authorization': `Bearer ${session.access_token}` } : {})}, body: JSON.stringify({content, lite_mode: liteMode}) }); const data = await res.json(); if (!res.ok) throw new Error(data.detail || 'Analysis failed.'); result = data; const history = JSON.parse(localStorage.getItem('trustline-history') || '[]'); history.unshift({ content: content.slice(0, 80), risk: data.traffic_light, time: 'Just now' }); localStorage.setItem('trustline-history', JSON.stringify(history.slice(0, 12))); page = 'result'; } catch (error) { showToast(error.message || 'Unable to check this content.'); page = 'scan'; } finally { checking = false; } }
   async function copyCorrection() { try { await navigator.clipboard.writeText(result.correction_snippet); page = 'correction'; } catch { showToast('Select the correction and copy it.'); } }
   async function shareCorrection() { try { if (navigator.share) await navigator.share({ title: 'TrustLine correction', text: result?.correction_snippet }); page = 'share-done'; } catch { page = 'share'; } }
   const historyItems = () => JSON.parse(localStorage.getItem('trustline-history') || '[]');
@@ -33,7 +72,10 @@
       <section class="onboarding-screen"><img class="onboarding-hero" src="/figma-assets/onboarding-hero.png" alt="People checking information together"/><div class="onboarding-copy"><h1>Think First.<br/>Share Better.</h1><p>Verify information, understand the truth behind it, and learn the skills to recognize misinformation—before you share.</p><button class="main-button" onclick={() => page = 'signin'}>Get started</button></div><div class="onboarding-nav" aria-label="Primary navigation">{#each navItems as item}<button onclick={() => page = item[0]} class:active={item[0] === 'scan'}><img src={item[1]} alt=""/><span>{item[2]}</span></button>{/each}</div></section>
     {:else if page === 'signin' || page === 'signup'}
       <header class="brand-row"><div class="brand"><img src={asset.logo} alt=""/> <strong>Trust</strong>Line</div></header>
-      <section class="auth-screen"><h1>{page === 'signin' ? 'Log in to TrustLine' : 'Let’s get you started'}</h1><p>{page === 'signin' ? 'Welcome back. Check before you share.' : 'Create an account to keep learning.'}</p><label>Email<input type="email" placeholder="name@email.com"/></label><label>Password<input type="password" placeholder="••••••••"/></label><button class="main-button" onclick={authenticate}>{page === 'signin' ? 'Log in' : 'Create an account'}</button><div class="divider"><span></span>or<span></span></div><button class="auth-provider">Continue with Google</button><button class="auth-provider">Continue with Facebook</button><p class="auth-switch">{page === 'signin' ? 'Don’t have an account?' : 'Already have an account?'} <button onclick={() => page = page === 'signin' ? 'signup' : 'signin'}>{page === 'signin' ? 'Sign up' : 'Log in'}</button></p></section>
+      <section class="auth-screen"><h1>{page === 'signin' ? 'Log in to TrustLine' : 'Let’s get you started'}</h1><p>{page === 'signin' ? 'Welcome back. Check before you share.' : 'Create an account to keep learning.'}</p><label>Email<input type="email" bind:value={email} placeholder="name@email.com"/></label><label>Password<input type="password" bind:value={password} placeholder="••••••••"/></label>{#if authError}<p class="auth-error">{authError}</p>{/if}<button class="main-button" onclick={handleAuth}>{page === 'signin' ? 'Log in' : 'Create an account'}</button><div class="divider"><span></span>or<span></span></div><button class="auth-provider">Continue with Google</button><button class="auth-provider">Continue with Facebook</button><p class="auth-switch">{page === 'signin' ? 'Don’t have an account?' : 'Already have an account?'} <button onclick={() => page = page === 'signin' ? 'signup' : 'signin'}>{page === 'signin' ? 'Sign up' : 'Log in'}</button></p></section>
+    {:else if page === 'check-email'}
+      <header class="brand-row"><div class="brand"><img src={asset.logo} alt=""/> <strong>Trust</strong>Line</div></header>
+      <section class="learning-intro"><img src={asset.lock} alt=""/><h1>Check your inbox</h1><p>We sent a confirmation link to <b>{email}</b>. Click it to activate your account, then come back and log in.</p><button class="main-button" onclick={() => { page = 'signin'; }}>Back to login</button></section>
     {:else if page === 'scan'}
       <header class="brand-row"><div class="brand"><img src={asset.logo} alt=""/> <strong>Trust</strong>Line</div><button class="language"><img src={asset.globe} alt=""/> EN <span>⌄</span></button></header>
       <section class="lite"><div><img src={asset.bolt} alt=""/><p><b>Lite mode</b><small>Designed for slow internet</small></p></div><button class:enabled={liteMode} class="switch" onclick={() => liteMode = !liteMode} aria-label="Toggle lite mode"><i></i></button></section>
@@ -86,10 +128,10 @@
         {/if}
       </section>
     {:else if page === 'profile'}
-      <header class="history-title"><b>Profile</b></header><section class="completion-screen profile-screen"><div class="completion-icon">T</div><h1>TrustLine learner</h1><p>Keep checking, keep learning.</p><button class="auth-provider" onclick={() => { localStorage.removeItem('trustline-onboarded'); page='onboarding'; }}>Log out</button></section>
+      <header class="history-title"><b>Profile</b></header><section class="completion-screen profile-screen"><div class="completion-icon">T</div><h1>{session?.user?.email || 'TrustLine learner'}</h1><p>Keep checking, keep learning.</p><button class="auth-provider" onclick={logout}>Log out</button></section>
     {/if}
   </div>
-  {#if !['onboarding', 'signin', 'signup', 'loading', 'correction', 'share', 'share-done'].includes(page)}<nav>{#each navItems as item}<button class:active={page === item[0] || (item[0] === 'learn' && page.startsWith('learn')) || (item[0] === 'learn' && page === 'lesson-result')} onclick={() => item[0] === 'profile' ? page = 'profile' : page = item[0]}><img src={item[1]} alt=""/><span>{item[2]}</span></button>{/each}</nav>{/if}
+  {#if !['onboarding', 'signin', 'signup', 'check-email', 'loading', 'correction', 'share', 'share-done'].includes(page)}<nav>{#each navItems as item}<button class:active={page === item[0] || (item[0] === 'learn' && page.startsWith('learn')) || (item[0] === 'learn' && page === 'lesson-result')} onclick={() => item[0] === 'profile' ? page = 'profile' : page = item[0]}><img src={item[1]} alt=""/><span>{item[2]}</span></button>{/each}</nav>{/if}
 </main>
 {#if showFullText}
   <div class="full-text-overlay">
@@ -178,6 +220,7 @@
   .auth-screen > p { margin: 7px 0 18px; color: #475569; font-size: 14px; }
   .auth-screen label { display: grid; gap: 7px; margin: 14px 0; font-size: 13px; font-weight: 600; }
   .auth-screen input { height: 43px; padding: 0 12px; border: 1px solid #00000024; border-radius: 8px; font: 400 14px inherit; }
+  .auth-error { color: #b42318; font-size: 13px; margin: -8px 0 12px; }
   .auth-provider { width: 100%; height: 43px; margin: 5px 0; border: 1px solid #0000002b; border-radius: 99px; background: #fff; font: 600 14px inherit; }
   .auth-switch { text-align: center; }
   .auth-switch button { padding: 0; border: 0; background: transparent; color: #2563eb; font: 600 13px inherit; }
